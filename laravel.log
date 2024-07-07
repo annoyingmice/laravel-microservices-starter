@@ -1,0 +1,13 @@
+[
+    {
+        "version": "1.1",
+        "host": "example.com",
+        "short_message": "This is a short message",
+        "full_message": "This is a detailed message providing more context",
+        "timestamp": 1625704400.123456,
+        "level": 6,
+        "_user_id": 12345,
+        "_app_name": "MyApp",
+        "_custom_field": "Some custom value"
+    }
+]

@@ -1,0 +1,154 @@
+networks:
+    tikk:
+
+services:
+    user:
+        build:
+            context: ./services/user
+            dockerfile: Dockerfile.dev
+        container_name: user
+        working_dir: /var/www/html
+        depends_on:
+            - database
+        volumes:
+            - ./services/user:/var/www/html
+        environment:
+            APACHE_DOCUMENT_ROOT: /var/www/html/public
+            # S3
+            AWS_ACCESS_KEY_ID: krzlXzYI1yUthhSBKSgY
+            AWS_SECRET_ACCESS_KEY: r6VEvXnyDXWIMETSrExGeE54KjRcUA7gpuEirsf3
+            AWS_DEFAULT_REGION: ap-southeast-1a
+            AWS_BUCKET: tikk
+            # SQS
+            QUEUE_CONNECTION: sqs
+            SQS_PREFIX: http://localhost:9324/queue/tikk
+            # CACHE
+            CACHE_STORE: redis
+            # REDIS
+            REDIS_CLIENT: phpredis
+            REDIS_HOST: redis
+            REDIS_PASSWORD: password
+            REDIS_PORT: 6379
+            # DATABASE
+            DB_CONNECTION: mysql
+            DB_HOST: database
+            DB_PORT: 3306
+            DB_DATABASE: laravel
+            DB_USERNAME: user
+            DB_PASSWORD: password
+            # LOG
+            LOG_CHANNEL: stack
+            LOG_STACK: promtail
+            LOG_LEVEL: debug
+        networks:
+            - tikk
+
+    # @NOTE: This will handle all request and pass the request to all the services
+    nginx:
+        build:
+            context: ./
+            dockerfile: Dockerfile
+        container_name: nginx
+        depends_on:
+            - user
+        ports:
+            - 80:80
+        networks:
+            - tikk
+
+    # @NOTE: This is the database that all services should be using
+    database:
+        image: mysql:latest
+        container_name: database
+        volumes:
+            - ./mysql:/var/lib/mysql
+        environment:
+            MYSQL_ROOT_PASSWORD: password
+            MYSQL_DATABASE: laravel
+            MYSQL_USER: user
+            MYSQL_PASSWORD: password
+        ports:
+            - 3306:3306
+        networks:
+            - tikk
+
+    # @NOTE: This is object storage act as S3
+    s3:
+        image: minio/minio
+        container_name: s3
+        command: server /data --console-address ":9001"
+        volumes:
+            - ./minio:/data
+        environment:
+            MINIO_ROOT_USER: user
+            MINIO_ROOT_PASSWORD: password
+        ports:
+            - 9000:9000
+            - 9001:9001
+        networks:
+            - tikk
+    
+    # @NOTE: This is queuing like sqs
+    sqs:
+        image: softwaremill/elasticmq-native
+        container_name: sqs
+        volumes:
+            - ./elasticmq.conf:/etc/elasticmq/elasticmq.conf
+        environment:
+            JAVA_OPTS: -Dconfig.file=/etc/elasticmq/elasticmq.conf
+        ports:
+            - 9324:9324
+        networks:
+            - tikk
+
+    # @NOTE: This is the local storage caching
+    redis:
+        image: redis:latest
+        container_name: redis
+        environment:
+            REDIS_HOST: redis
+            REDIS_PASSWORD: password
+        ports:
+            - 6379:6379
+        networks:
+            - tikk
+    
+    # @NOTE: This is for log monitoring
+    grafana:
+        image: grafana/grafana:latest
+        container_name: grafana
+        volumes:
+            - ./grafana:/var/lib/grafana
+        environment:
+            GF_SECURITY_ADMIN_PASSWORD: password
+        ports:
+            - 3000:3000
+        networks:
+            - tikk
+
+    # @NOTE: This is for notification and forwarding to grafana
+    promtail:
+        image: grafana/promtail:latest
+        container_name: grafana-promtail
+        command: -config.file=/mnt/config/promtail-config.yaml
+        depends_on:
+            - loki
+        volumes:
+            - ./promtail-config.yaml:/mnt/config/promtail-config.yaml
+        ports:
+            - 12201:12201/udp
+        networks:
+            - tikk
+    
+    # @NOTE: This is for log collection
+    loki:
+        image: grafana/loki:latest
+        container_name: grafana-loki
+        command: -config.file=/mnt/config/loki-config.yaml
+        volumes:
+            - ./loki-config.yaml:/mnt/config/loki-config.yaml
+            - ./loki:/loki
+        ports:
+            - 3100:3100
+        networks:
+            - tikk

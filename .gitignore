@@ -1,0 +1,16 @@
+mysql/*
+!mysql/.gitkeep
+minio/*
+!minio/.gitkeep
+loki/*
+!loki/.gitkeep
+loki/cache/*
+!loki/cache/.gitkeep
+loki/chunks/*
+!loki/chunks/.gitkeep
+loki/index/*
+!loki/index/.gitkeep
+loki/wal/*
+!loki/wal/.gitkeep
+grafana/*
+!grafana/.gitkeep
